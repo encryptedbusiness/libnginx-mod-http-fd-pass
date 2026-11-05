@@ -639,8 +639,6 @@ ngx_http_fd_pass_build(ngx_http_request_t *r, ngx_http_fd_pass_ctx_t *ctx)
         return rc;
     }
 
-    ktls_rx = 0;
-
     if (r->connection->ssl) {
         SSL  *ssl = r->connection->ssl->connection;
         BIO  *bio = SSL_get_wbio(ssl);

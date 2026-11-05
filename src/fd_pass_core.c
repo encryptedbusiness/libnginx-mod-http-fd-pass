@@ -390,7 +390,8 @@ fdp_build_headers(const fdp_header_t *h, size_t n,
     for (j = 0; j < ng; j++) {
         size_t combined = g[j].value_total;
 
-        sep = g[j].cookie ? "; " : ", ";
+        /* Cookie and comma separators are both two bytes. The text is
+         * chosen when the value is emitted. */
         sep_len = 2;
         if (g[j].count > 1) {
             size_t extra = g[j].count - 1;
