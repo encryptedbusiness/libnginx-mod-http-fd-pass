@@ -10,8 +10,9 @@ jobs:
     container: fedora:44
     steps:
       - uses: actions/checkout@v4
-      - run: dnf install -y clang clang-analyzer cppcheck gcc make perl wget tar findutils gzip \
-          pcre2-devel zlib-devel openssl-devel
+      - run: |
+          dnf install -y clang clang-analyzer cppcheck gcc make perl wget \
+            tar findutils gzip pcre2-devel zlib-devel openssl-devel
       - name: scan-build
         run: |
           wget -q https://nginx.org/download/nginx-1.27.5.tar.gz
