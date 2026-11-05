@@ -3,6 +3,49 @@
 libnginx-mod-http-fd-pass is a custom [NGINX](https://github.com/nginx/nginx/) module that passes on incoming client connections to another process using an extended [SimpleCGI (SCGI) protocol](https://en.wikipedia.org/wiki/Simple_Common_Gateway_Interface).
 Uniquely, it sends the actual client file descriptor (FD) via an [`SCM_RIGHTS`](https://man7.org/linux/man-pages/man7/unix.7.html#:~:text=SCM_RIGHTS) ancillary message along with the initial HTTP request headers.
 
+## Hardened fork (v2)
+
+This fork fixes the v1 audit findings (see `MODULE_AUDIT_v2.md`):
+
+- **Trailing bytes are forwarded.** The module sends `FD_PASS_PROTOCOL=2`,
+  `FD_PASS_PREFIX_LEN=<n>` and writes the bytes nginx already read past the
+  request head (the `r->header_in` tail) after the SCGI netstring. The backend
+  must read `n` bytes and prepend them to the client stream. Set
+  `fd_pass_prefix on;` in the location. With the default `off`, a request with
+  trailing bytes is rejected with `400` instead of silently losing them.
+- **Bodies are rejected.** `fd_pass_reject_body on` (default) returns `400` for
+  `Content-Length > 0`, `Transfer-Encoding`, or `Expect`.
+- **Headers are safe.** Duplicate headers are combined per RFC 7230 (`Cookie`
+  with `"; "`). Header names containing `_`, and distinct names that normalize
+  to the same SCGI name (`X-Foo` vs `X_Foo`), are rejected. Duplicate
+  single-value headers (`Host`, `Content-Length`, `Transfer-Encoding`,
+  `Sec-WebSocket-Key`, `Sec-WebSocket-Version`, `Origin`) are rejected.
+- **SCM_RIGHTS is aligned and retried.** The control buffer is properly aligned;
+  short writes and `EAGAIN` are retried with the fd sent exactly once; an
+  in-progress nonblocking connect is completed.
+- **TLS 1.3 requires full kTLS.** The TX-only path was removed. Use OpenSSL
+  3.2+ and `ssl_conf_command Options KTLS`.
+- **Timeouts and peer checks.** `fd_pass_connect_timeout`, `fd_pass_send_timeout`,
+  `fd_pass_peer_uid`, `fd_pass_peer_gid`.
+
+New directives: `fd_pass_prefix`, `fd_pass_reject_body`,
+`fd_pass_combine_headers`, `fd_pass_allow_underscore_headers`,
+`fd_pass_reject_duplicate_critical`, `fd_pass_require_full_ktls`,
+`fd_pass_require_upgrade`, `fd_pass_max_prefix`, `fd_pass_connect_timeout`,
+`fd_pass_send_timeout`, `fd_pass_peer_uid`, `fd_pass_peer_gid`.
+
+Wire extension v2:
+
+```
+FD_PASS_PROTOCOL   = 2
+FD_PASS_PREFIX_LEN = <n>
+FD_PASS_BODY_LEN   = 0
+<netstring payload>,<n prefix bytes>
+```
+
+The prefix bytes are outside the netstring length. See `THREAT_MODEL.md` for
+the TLS post-handoff limitations (`close_notify`, `KeyUpdate`).
+
 ## How It Works
 
 1. Receive Request: Nginx accepts a new client connection (HTTP or HTTPS with [Kernel TLS offload](https://docs.kernel.org/networking/tls-offload.html)).

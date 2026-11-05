@@ -50,3 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Test binaries and fuzz artifacts (module tests only; no benchmark data)
+tests/unit/test_core
+tests/fuzz/corpus/*
+tests/fuzz/crash-*
+tests/fuzz/leak-*
+tests/fuzz/timeout-*

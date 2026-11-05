@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: deps
+        run: |
+          dnf install -y gcc make clang pcre2-devel zlib-devel openssl-devel \
+            perl wget tar findutils cppcheck
+
+      - name: unit tests (ASAN/UBSAN)
+        run: make -C tests/unit check
+
+      - name: build nginx with the module
+        run: |
+          wget -q https://nginx.org/download/nginx-1.27.5.tar.gz
+          tar xzf nginx-1.27.5.tar.gz
+          cd nginx-1.27.5
+          ./configure --prefix=/tmp/nginx --with-http_ssl_module \
+            --add-module="$GITHUB_WORKSPACE" \
+            --with-cc-opt='-O2 -g -Wall -Wextra -Werror'
+          make -j"$(nproc)"
+          /tmp/nginx/sbin/nginx -V || true
+
+      - name: fuzz smoke (60s)
+        run: |
+          clang -std=c11 -g -O1 -fsanitize=fuzzer,address,undefined \
+            -I src tests/fuzz/fuzz_headers.c src/fd_pass_core.c \
+            -o /tmp/fuzz_headers
+          /tmp/fuzz_headers -max_total_time=60 -rss_limit_mb=512
+
+      - name: static analysis
+        run: |
+          cppcheck --enable=all --error-exitcode=1 --suppress=missingIncludeSystem \
+            src ngx_http_fd_pass_module.c

@@ -1,0 +1,27 @@
+name: fuzz
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - run: dnf install -y clang
+      - name: headers/frame fuzz (10 min)
+        run: |
+          clang -std=c11 -g -O1 -fsanitize=fuzzer,address,undefined \
+            -I src tests/fuzz/fuzz_headers.c src/fd_pass_core.c \
+            -o /tmp/fuzz_headers
+          mkdir -p corpus
+          cp -R tests/fuzz/corpus/* corpus/ 2>/dev/null || true
+          /tmp/fuzz_headers -max_total_time=600 corpus -rss_limit_mb=1024
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fuzz-crash
+          path: crash-*

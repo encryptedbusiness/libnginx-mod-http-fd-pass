@@ -1,0 +1,25 @@
+name: static
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - run: dnf install -y clang clang-analyzer cppcheck pcre2-devel zlib-devel openssl-devel
+      - name: scan-build
+        run: |
+          wget -q https://nginx.org/download/nginx-1.27.5.tar.gz
+          tar xzf nginx-1.27.5.tar.gz
+          cd nginx-1.27.5
+          scan-build --status-bugs ./configure --with-http_ssl_module \
+            --add-module="$GITHUB_WORKSPACE"
+          scan-build --status-bugs make -j"$(nproc)"
+      - name: cppcheck
+        run: |
+          cppcheck --enable=all --error-exitcode=1 --suppress=missingIncludeSystem \
+            src ngx_http_fd_pass_module.c
