@@ -11,7 +11,7 @@ jobs:
     container: fedora:44
     steps:
       - uses: actions/checkout@v4
-      - run: dnf install -y clang
+      - run: dnf install -y clang compiler-rt
       - name: headers/frame fuzz (10 min)
         run: |
           clang -std=c11 -g -O1 -fsanitize=fuzzer,address,undefined \

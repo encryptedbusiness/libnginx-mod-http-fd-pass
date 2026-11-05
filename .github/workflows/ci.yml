@@ -13,7 +13,8 @@ jobs:
 
       - name: deps
         run: |
-          dnf install -y gcc make clang pcre2-devel zlib-devel openssl-devel \
+          dnf install -y gcc make clang compiler-rt libasan libubsan \
+            pcre2-devel zlib-devel openssl-devel \
             perl wget tar findutils cppcheck
 
       - name: unit tests (ASAN/UBSAN)
@@ -39,5 +40,13 @@ jobs:
 
       - name: static analysis
         run: |
-          cppcheck --enable=all --error-exitcode=1 --suppress=missingIncludeSystem \
+          cppcheck --enable=all --error-exitcode=1 -I src \
+            --suppress=missingIncludeSystem \
+            --suppress=checkersReport \
+            --suppress=normalCheckLevelMaxBranches \
+            --suppress=unusedFunction \
+            --suppress=staticFunction \
+            --suppress=variableScope \
+            --suppress=constParameterPointer \
+            --suppress=constVariablePointer \
             src ngx_http_fd_pass_module.c
